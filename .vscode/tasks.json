@@ -1,0 +1,26 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "build-simulations",
+        "type": "shell",
+        "command": "clang++",
+        "args": [
+          "simulations.cpp",
+          "-o", "simulations",
+          "-std=c++14",
+          "-I/usr/local/opt/curl/include",
+          "-L/usr/local/opt/curl/lib",
+          "-lcurl"
+        ],
+        "group": {
+          "kind": "build",
+          "isDefault": true
+        },
+        "problemMatcher": []
+      }
+    ]
+  }
+  
+
+  
