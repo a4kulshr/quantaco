@@ -1,8 +1,9 @@
 #include <iostream>
 #include <curl/curl.h>
 #include "json.hpp"
+#include <string>
 using json = nlohmann::json;
-
+// 252 trading days setting GBM path 
 static size_t WriteCallback(void* contents, size_t size, size_t nmemb, std::string* s) {
     size_t newLength = size * nmemb;
     s->append((char*)contents, newLength);
@@ -14,7 +15,7 @@ int main() {
     CURLcode res;
     std::string readBuffer;
 
-    std::string url = "https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=AAPL&apikey=YOUR_API_KEY";
+    std::string url = "https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=AMT&apikey=F8Y8DSU6J7URM9JO";
 
     curl = curl_easy_init();
     if(curl) {
@@ -30,3 +31,14 @@ int main() {
 
     return 0;
 }
+
+// set public class for stock
+class orderbook {
+    public :
+    std :: string stock;
+
+
+}
+
+// Set GBM parameters and muh sigma and logs
+//Plot trajectories check asscoaited features
