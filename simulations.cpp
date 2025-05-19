@@ -14,8 +14,9 @@ int main() {
     CURL* curl;
     CURLcode res;
     std::string readBuffer;
+    std::string ticker = "AMT";
+    std::string url = "https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=AAPL&apikey=F8Y8DSU6J7URM9JO";
 
-    std::string url = "https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=AMT&apikey=F8Y8DSU6J7URM9JO";
 
     curl = curl_easy_init();
     if(curl) {
@@ -33,12 +34,7 @@ int main() {
 }
 
 // set public class for stock
-class orderbook {
-    public :
-    std :: string stock;
 
-
-}
 
 // Set GBM parameters and muh sigma and logs
 //Plot trajectories check asscoaited features
