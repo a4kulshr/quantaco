@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Minimum-Variance Frontier</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <canvas id="frontierChart" width="800" height="500"></canvas>
+  <script>
+    fetch("frontier_data.json")
+      .then(res => res.json())
+      .then(data => {
+        const ctx = document.getElementById("frontierChart").getContext("2d");
+        new Chart(ctx, {
+          type: "line",
+          data: {
+            labels: data.volatility,
+            datasets: [{
+              label: "Min-Variance Frontier",
+              data: data.return.map((y, i) => ({ x: data.volatility[i], y })),
+              borderColor: "blue",
+              fill: false
+            }]
+          },
+          options: {
+            responsive: true,
+            plugins: {
+              title: {
+                display: true,
+                text: "Minimum-Variance Frontier"
+              }
+            },
+            scales: {
+              x: { title: { display: true, text: "Portfolio Volatility" } },
+              y: { title: { display: true, text: "Target Expected Return" } }
+            }
+          }
+        });
+      });
+  </script>
+</body>
+</html>
