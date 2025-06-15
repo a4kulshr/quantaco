@@ -11,6 +11,7 @@ import logging
 import os
 import json
 from pathlib import Path
+from curl_cffi import requests
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -39,7 +40,7 @@ def save_to_cache(data, ticker, start_date, end_date):
     data.to_csv(cache_file)
     logging.info(f"Saved data to cache for {ticker}")
 
-def get_stock_data(ticker, start_date, end_date, max_retries=5, delay=5):
+def get_stock_data(ticker, start_date, end_date, max_retries=5, delay=10):
     """
     Fetch stock data from yfinance with retry logic, rate limit handling, and caching
     """
@@ -48,15 +49,18 @@ def get_stock_data(ticker, start_date, end_date, max_retries=5, delay=5):
     if cached_data is not None:
         return cached_data['Close'].pct_change().dropna()
 
+    # Create a session with browser-like headers
+    session = requests.Session(impersonate="chrome")
+    
     for attempt in range(max_retries):
         try:
             logging.info(f"Attempt {attempt + 1} to fetch data for {ticker}")
-            stock = yf.Ticker(ticker)
+            stock = yf.Ticker(ticker, session=session)
             
             # Split the date range into smaller chunks to avoid rate limits
             start = datetime.strptime(start_date, '%Y-%m-%d')
             end = datetime.strptime(end_date, '%Y-%m-%d')
-            chunk_size = timedelta(days=30)  # 1 month chunks
+            chunk_size = timedelta(days=15)  # Reduced chunk size to 15 days
             
             all_data = []
             current_start = start
@@ -76,7 +80,7 @@ def get_stock_data(ticker, start_date, end_date, max_retries=5, delay=5):
                     all_data.append(df_chunk)
                 
                 current_start = current_end
-                time.sleep(delay)  # Add delay between requests
+                time.sleep(delay * 2)  # Double delay between requests
             
             if not all_data:
                 raise ValueError(f"No data found for {ticker}")
@@ -95,7 +99,7 @@ def get_stock_data(ticker, start_date, end_date, max_retries=5, delay=5):
                 logging.error(f"Failed to fetch data after {max_retries} attempts: {str(e)}")
                 raise
             logging.warning(f"Attempt {attempt + 1} failed: {str(e)}. Retrying...")
-            time.sleep(delay * (attempt + 1))  # Exponential backoff
+            time.sleep(delay * (attempt + 1) * 2)  # Exponential backoff with longer delays
 
 def calculate_weights_and_sharpe(returns, sigma=0.04):
     """
