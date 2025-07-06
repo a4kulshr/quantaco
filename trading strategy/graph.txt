@@ -1,0 +1,58 @@
+import yfinance as yf
+import numpy as np
+import pandas as pd
+import backtrader as bt
+import matplotlib.pyplot as plt
+import seaborn as sn
+import statsmodels.api as sm
+from statsmodels.tsa.stattools import coint 
+
+
+# Download closing prices only
+AMT_data = yf.download("AMT", period="5y", multi_level_index=False)
+CCI_data = yf.download("CCI", period="5y", multi_level_index=False)
+
+# Ensure datetime index
+AMT_data.index = pd.to_datetime(AMT_data.index)
+CCI_data.index = pd.to_datetime(CCI_data.index)
+#merge the two dataframes
+stock_data = pd.merge(AMT_data, CCI_data, left_index=True, right_index=True)
+# Preview
+print(AMT_data.head())
+print(CCI_data.head())
+
+amt = yf.download("AMT", period="5y")["Close"].dropna()
+cci = yf.download("EQIX", period="5y")["Close"].dropna()
+
+# 2. Merge into one DataFrame
+stock_data = pd.merge(amt, cci, left_index=True, right_index=True)
+
+# 3. OLS hedge ratio
+X = sm.add_constant(stock_data["AMT"])   # DataFrame with columns ['const','AMT']
+Y = stock_data["EQIX"]
+model = sm.OLS(Y, X).fit()
+hedge_ratio = model.params["AMT"]
+print(f"Hedge Ratio (Beta): {hedge_ratio:.4f}")
+
+# 4. Cointegration test
+score, p_value, _ = coint(stock_data["AMT"], stock_data["EQIX"])
+print(f"Cointegration Score: {score:.4f}, p-value: {p_value:.4f}")
+if p_value < 0.05:
+    print("The series are cointegrated.")
+else:
+    print("The series are not cointegrated.")
+
+
+spread = stock_data['AMT'] - hedge_ratio * stock_data['CCI']
+spread.name = 'Spread'
+stock_data['Spread'] = spread  # Add the spread series directly to the DataFrame
+
+# Plot the spread
+plt.figure(figsize=(12, 6))
+plt.plot(stock_data['Spread'], label='AMT Spread', color='blue')
+plt.axhline(spread.mean(), color='red', linestyle='--', label='Mean Spread')
+plt.title('Spread between CCI and AMT')
+plt.xlabel('Date')
+plt.ylabel('Spread')
+plt.legend()
+plt.show()
