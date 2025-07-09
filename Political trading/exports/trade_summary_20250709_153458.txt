@@ -1,0 +1,15 @@
+CAPITOL TRADES ANALYSIS SUMMARY
+==================================================
+
+Total Trades: 5
+Recent Activity (30 days): 5
+
+BUY/SELL BREAKDOWN:
+
+MOST ACTIVE STOCKS:
+  TEAM: 2 trades
+  AVGO: 1 trades
+  AMZN: 1 trades
+  APP: 1 trades
+
+PARTY BREAKDOWN:
