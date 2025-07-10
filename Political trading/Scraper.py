@@ -5,6 +5,9 @@ from bs4 import BeautifulSoup
 import pandas as pd
 import time
 import datetime 
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.by import By
 
 # 1. Set up Selenium headless Chrome
 options = Options()
@@ -14,7 +17,8 @@ service = Service('/usr/local/bin/chromedriver')
 driver = webdriver.Chrome(service=Service(), options=options)
 driver.get("https://www.capitoltrades.com/")
 
-time.sleep(7)  # Allow time for dynamic content to load
+#insert a delay to allow page to load
+WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.CLASS_NAME, "trade-table-row")))
 
 # 3. Extract page HTML and parse
 soup = BeautifulSoup(driver.page_source, 'html.parser')
