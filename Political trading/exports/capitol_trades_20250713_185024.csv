@@ -1,0 +1,6 @@
+trade_date,days_ago,issuer,ticker,representative,amount_min,amount_max,amount_range
+,,Meta Platforms Inc,META,John McGuire,1000.0,15000.0,1K–15K
+,,Netflix Inc,NFLX,John McGuire,1000.0,15000.0,1K–15K
+,,ServiceNow Inc,NOW,John McGuire,1000.0,15000.0,1K–15K
+,,FULL HOUSE RESORTS INC,FLL,Susie Lee,250000.0,500000.0,250K–500K
+,,FULL HOUSE RESORTS INC,FLL,Susie Lee,500000.0,1000000.0,500K–1M

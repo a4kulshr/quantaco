@@ -1,0 +1,15 @@
+CAPITOL TRADES ANALYSIS SUMMARY
+==================================================
+
+Total Trades: 5
+Recent Activity (30 days): 0
+
+BUY/SELL BREAKDOWN:
+
+MOST ACTIVE STOCKS:
+  FLL: 2 trades
+  META: 1 trades
+  NFLX: 1 trades
+  NOW: 1 trades
+
+PARTY BREAKDOWN:
