@@ -4,26 +4,17 @@ from selenium.webdriver.chrome.options import Options
 from bs4 import BeautifulSoup
 import pandas as pd
 import time
-import datetime
-import re 
+import datetime 
 
-def scrape_capitol_trades(max_volume_threshold=None, max_rows=500):
-    """
-    Scrape capitol trades with optional volume filtering
-    
-    Args:
-        max_volume_threshold: Maximum volume threshold for filtering stocks
-        max_rows: Maximum number of rows to scrape (default 500)
-    """
-    # 1. Set up Selenium headless Chrome
-    options = Options()
-    options.add_argument('--headless')
-    options.add_argument('--disable-gpu')
-    service = Service('/usr/local/bin/chromedriver') 
-    driver = webdriver.Chrome(service=Service(), options=options)
-    driver.get("https://www.capitoltrades.com/")
+# 1. Set up Selenium headless Chrome
+options = Options()
+options.add_argument('--headless')
+options.add_argument('--disable-gpu')
+service = Service('/usr/local/bin/chromedriver') 
+driver = webdriver.Chrome(service=Service(), options=options)
+driver.get("https://www.capitoltrades.com/")
 
-    time.sleep(7)  # Allow time for dynamic content to load
+time.sleep(7)  # Allow time for dynamic content to load
 
     # 3. Extract page HTML and parse
     soup = BeautifulSoup(driver.page_source, 'html.parser')
