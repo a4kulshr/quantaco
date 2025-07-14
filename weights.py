@@ -15,7 +15,7 @@ def calculate_weights_and_sharpe(returns, sigma=0.04):
     inverse_S = np.linalg.inv(S)
     S = (S + S.T) / 2
     inv_S = inv(S)
-    w = inv_S.dot(mu)
+    w = inv_S.dot(mu) # mu *  transpose of mu
     theta = np.dot(mu, w)
 # Scale weights to target volatility
     portfolio_vol = np.sqrt(np.dot(w.T, S.dot(w)))
@@ -73,3 +73,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+   

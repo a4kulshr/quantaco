@@ -15,14 +15,14 @@ options.add_argument('--headless')
 options.add_argument('--disable-gpu')
 service = Service('/usr/local/bin/chromedriver') 
 driver = webdriver.Chrome(service=Service(), options=options)
-driver.get("https://www.capitoltrades.com/")
+driver.get("https://www.capitoltrades.com/trades")
 
 #insert a delay to allow page to load
-WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.CLASS_NAME, "trade-table-row")))
+WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.CLASS_NAME, "site-main")))
 
 # 3. Extract page HTML and parse
 soup = BeautifulSoup(driver.page_source, 'html.parser')
-rows = soup.find_all("div", class_="trade-table-row")
+rows = soup.find_all("div", class_="site-main")
 
 # set up HTML table scrape 
 table = soup.find("div", class_="trade-table")
@@ -33,28 +33,19 @@ if not table:
 
 # 4. Scrape first 100 rows of trades
 df_rows = []
-rows = table.find_all("div", class_="trade-table-row", limit=100)
-
+rows = table.find_all("div", class_="site-main", limit=100)
+#read by indexing by tr number
 for row in rows:
     try:
-        rep = row.find("div", class_="rep-info").get_text(strip=True)
-        issuer = row.find("div", class_="issuer").get_text(strip=True)
-        ticker = row.find("div", class_="ticker").get_text(strip=True)
-
-        date = row.find("div", class_="trade-date").get_text(strip=True)# read as date
-        # Convert date string to datetime object
-        date = datetime.datetime.strptime(date, "%m/%d/%Y").date() 
-        price = row.find("div", class_="price").get_text(strip=True)
-
-        df_rows.append({
-            "Representative": rep,
-            "Ticker": ticker,
-            "Date": date,
-            "Issuer": issuer,
-            "Price": price
-        })
+        politician = row.find_all[0].get_text(strip=True)
+        trade_issuer = row.find_all[1].get_text(strip=True)
+        traded_at = row.find_all[3].get_text(strip=True)
+        type = row.find_all[6].get_text(strip=True)
+        size = row.find_all[7].get_text(strip=True)
+        price = row.find_all[8].get_text(strip=True)
     except Exception as e:
-        print("Skipping row due to error:", e)
+        print(f"Error processing row: {e}")
+
 
 df = pd.DataFrame(df_rows)
 
@@ -64,3 +55,4 @@ driver.quit()
 #df = pd.DataFrame(data)
 #df.to_csv("capitol_trades.csv", index=False)
 #print("Saved to capitol_trades.csv")
+#find.all (class_="trade-table")

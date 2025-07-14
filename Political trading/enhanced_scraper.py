@@ -170,7 +170,7 @@ class CapitolTradesScraper:
             print(f"Error extracting trade data: {e}")
             return None
     
-    def scrape_trades(self, max_trades=500):
+    def scrape_trades(self, max_trades=500): 
         """Scrape trade data from Capitol Trades"""
         try:
             print(f"Navigating to {self.base_url}")
@@ -236,6 +236,8 @@ class CapitolTradesScraper:
         except Exception as e:
             print(f"Error scraping trades: {e}")
             return []
+        
+        #add parameter to scrape trades of highest volume
     
     def analyze_trades(self, trades):
         """Analyze trade data for investment insights"""

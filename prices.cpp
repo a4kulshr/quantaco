@@ -53,3 +53,24 @@ int main() {
     curl_global_cleanup();
     return 0;
 }
+
+// choose high price if close price is below 200 otherwise choose close price use json parse to read the data
+
+double getPriceBasedOnCondition(const json& j) {
+    double selectedPrice = 0.0;
+    if (j.contains("Time Series (Daily)")) {
+        for (const auto& day : j["Time Series (Daily)"].items()) {
+            const auto& dailyData = day.value();
+            if (dailyData.contains("2. high") && dailyData.contains("4. close")) {
+                double highPrice = std::stod(dailyData["2. high"].get<std::string>());
+                double closePrice = std::stod(dailyData["4. close"].get<std::string>());
+                if (closePrice < 200) {
+                    selectedPrice = std::max(selectedPrice, highPrice);
+                } else {
+                    selectedPrice = std::max(selectedPrice, closePrice);
+                }
+            }
+        }
+    }
+    return selectedPrice;
+}
