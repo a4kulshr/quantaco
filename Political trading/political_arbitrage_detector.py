@@ -7,6 +7,138 @@ from sklearn.preprocessing import StandardScaler, LabelEncoder
 import yfinance as yf
 from datetime import datetime, timedelta
 import seaborn as sns
+from sklearn.neural_network import MLPClassifier
+
+def train_arbitrage_neural_network(arbitrage_results, stocks):
+    """
+    Train a neural network to recognize arbitrage patterns
+    """
+    print("Training neural network for arbitrage pattern recognition...")
+    
+    # Prepare features for neural network
+    features_list = []
+    labels_list = []
+    
+    for stock in stocks:
+        # Get stock data
+        returns = arbitrage_results['returns'][stock]
+        volume_data = arbitrage_results['volume_data'][stock]
+        political_surge = arbitrage_results['political_surge_indicators'][stock]
+        arbitrage_scores = arbitrage_results['arbitrage_scores'][stock]
+        
+        # Create features (last 5 periods for pattern recognition)
+        for i in range(5, len(returns)):
+            # Price features
+            price_features = [
+                returns.iloc[i-1], returns.iloc[i-2], returns.iloc[i-3], returns.iloc[i-4], returns.iloc[i-5],
+                volume_data.iloc[i-1] / volume_data.iloc[i-2] if volume_data.iloc[i-2] > 0 else 1,  # Volume ratio
+                political_surge.iloc[i-1], political_surge.iloc[i-2]
+            ]
+            
+            # Add politician metadata features
+            if stock in arbitrage_results['politician_metadata']:
+                metadata = arbitrage_results['politician_metadata'][stock]
+                politician_features = [
+                    1 if metadata['party'] == 'Republican' else 0,
+                    1 if metadata['sector'] == 'Technology' else 0,
+                    1 if metadata['volume'] == '1K-5K' else 0
+                ]
+            else:
+                politician_features = [0, 0, 0]
+            
+            # Combine all features
+            all_features = price_features + politician_features
+            features_list.append(all_features)
+            
+            # Create label: 1 for arbitrage period, 0 for normal
+            is_arbitrage = 1 if arbitrage_scores.iloc[i] > 0.7 else 0
+            labels_list.append(is_arbitrage)
+    
+    # Convert to numpy arrays
+    X = np.array(features_list)
+    y = np.array(labels_list)
+    
+    # Split data
+    from sklearn.model_selection import train_test_split
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+    
+    # Train neural network
+    mlp = MLPClassifier(
+        hidden_layer_sizes=(128, 64, 32),
+        activation='relu',
+        solver='adam',
+        max_iter=1000,
+        random_state=42,
+        early_stopping=True,
+        validation_fraction=0.1
+    )
+    
+    mlp.fit(X_train, y_train)
+    
+    # Evaluate
+    train_score = mlp.score(X_train, y_train)
+    test_score = mlp.score(X_test, y_test)
+    
+    print(f"Neural Network Training Results:")
+    print(f"  Training Accuracy: {train_score:.4f}")
+    print(f"  Test Accuracy: {test_score:.4f}")
+    
+    return mlp, X, y
+
+def predict_arbitrage_with_nn(arbitrage_results, stocks, mlp_model):
+    """
+    Use trained neural network to predict arbitrage periods
+    """
+    print("Predicting arbitrage periods with neural network...")
+    
+    nn_predictions = pd.DataFrame(index=arbitrage_results['returns'].index, columns=stocks)
+    nn_probabilities = pd.DataFrame(index=arbitrage_results['returns'].index, columns=stocks)
+    
+    for stock in stocks:
+        # Get stock data
+        returns = arbitrage_results['returns'][stock]
+        volume_data = arbitrage_results['volume_data'][stock]
+        political_surge = arbitrage_results['political_surge_indicators'][stock]
+        
+        stock_predictions = []
+        stock_probabilities = []
+        
+        for i in range(len(returns)):
+            if i < 5:  # Not enough history
+                stock_predictions.append(0)
+                stock_probabilities.append(0.0)
+            else:
+                # Create features (same as training)
+                price_features = [
+                    returns.iloc[i-1], returns.iloc[i-2], returns.iloc[i-3], returns.iloc[i-4], returns.iloc[i-5],
+                    volume_data.iloc[i-1] / volume_data.iloc[i-2] if volume_data.iloc[i-2] > 0 else 1,
+                    political_surge.iloc[i-1], political_surge.iloc[i-2]
+                ]
+                
+                # Add politician metadata features
+                if stock in arbitrage_results['politician_metadata']:
+                    metadata = arbitrage_results['politician_metadata'][stock]
+                    politician_features = [
+                        1 if metadata['party'] == 'Republican' else 0,
+                        1 if metadata['sector'] == 'Technology' else 0,
+                        1 if metadata['volume'] == '1K-5K' else 0
+                    ]
+                else:
+                    politician_features = [0, 0, 0]
+                
+                all_features = price_features + politician_features
+                
+                # Predict
+                prediction = mlp_model.predict([all_features])[0]
+                probability = mlp_model.predict_proba([all_features])[0][1]  # Probability of arbitrage
+                
+                stock_predictions.append(prediction)
+                stock_probabilities.append(probability)
+        
+        nn_predictions[stock] = stock_predictions
+        nn_probabilities[stock] = stock_probabilities
+    
+    return nn_predictions, nn_probabilities
 
 def detect_political_arbitrage_opportunities(stocks, politician_metadata, start_date='2020-01-01', end_date='2025-01-01'):
     """
@@ -146,7 +278,8 @@ def detect_political_arbitrage_opportunities(stocks, politician_metadata, start_
     # 7. Identify high-probability arbitrage periods
     high_arbitrage_periods = arbitrage_scores > 0.7  # Threshold for high probability
     
-    return {
+    # 8. Train and use neural network for pattern recognition
+    arbitrage_results = {
         'returns': returns,
         'volume_data': volume_data,
         'volatility_spikes': volatility_spikes,
@@ -164,6 +297,28 @@ def detect_political_arbitrage_opportunities(stocks, politician_metadata, start_
             'volume': volume_encoder
         }
     }
+    
+    # Train neural network
+    mlp_model, X, y = train_arbitrage_neural_network(arbitrage_results, stocks)
+    
+    # Get neural network predictions
+    nn_predictions, nn_probabilities = predict_arbitrage_with_nn(arbitrage_results, stocks, mlp_model)
+    
+    # Add neural network results to arbitrage_results
+    arbitrage_results['nn_predictions'] = nn_predictions
+    arbitrage_results['nn_probabilities'] = nn_probabilities
+    arbitrage_results['mlp_model'] = mlp_model
+    
+    # Create combined arbitrage detection (rule-based OR neural network)
+    combined_arbitrage = pd.DataFrame(index=returns.index, columns=stocks)
+    for stock in stocks:
+        combined_arbitrage[stock] = (
+            (arbitrage_scores[stock] > 0.7) | (nn_probabilities[stock] > 0.7)
+        )
+    
+    arbitrage_results['combined_arbitrage_periods'] = combined_arbitrage
+    
+    return arbitrage_results
 
 def visualize_arbitrage_analysis(arbitrage_results, stocks):
     """Comprehensive visualization of arbitrage analysis results"""
@@ -172,44 +327,60 @@ def visualize_arbitrage_analysis(arbitrage_results, stocks):
     plt.style.use('seaborn-v0_8')
     
     # Create figure with subplots
-    fig = plt.figure(figsize=(20, 24))
+    fig = plt.figure(figsize=(20, 28))
     
     # 1. Price movements with arbitrage periods highlighted
-    ax1 = plt.subplot(4, 2, 1)
+    ax1 = plt.subplot(5, 2, 1)
     for stock in stocks:
         ax1.plot(arbitrage_results['price_data'].index, arbitrage_results['price_data'][stock], 
                 label=stock, alpha=0.7, linewidth=1.5)
         
-        # Highlight arbitrage periods
+        # Highlight rule-based arbitrage periods
         stock_arbitrage_periods = arbitrage_results['high_arbitrage_periods'][stock]
         if stock_arbitrage_periods.any():
             arbitrage_dates = stock_arbitrage_periods[stock_arbitrage_periods].index
             if len(arbitrage_dates) > 0:
                 arbitrage_prices = arbitrage_results['price_data'].loc[arbitrage_dates, stock]
                 ax1.scatter(arbitrage_dates, arbitrage_prices, color='red', s=80, alpha=0.8, 
-                           marker='^', edgecolors='black', linewidth=1)
+                           marker='^', edgecolors='black', linewidth=1, label=f'{stock} Rule-Based' if stock == stocks[0] else "")
+        
+        # Highlight neural network arbitrage periods
+        if 'nn_predictions' in arbitrage_results:
+            nn_arbitrage_periods = arbitrage_results['nn_predictions'][stock] == 1
+            if nn_arbitrage_periods.any():
+                nn_dates = nn_arbitrage_periods[nn_arbitrage_periods].index
+                if len(nn_dates) > 0:
+                    nn_prices = arbitrage_results['price_data'].loc[nn_dates, stock]
+                    ax1.scatter(nn_dates, nn_prices, color='green', s=60, alpha=0.8, 
+                               marker='x', edgecolors='black', linewidth=1, label=f'{stock} NN' if stock == stocks[0] else "")
 
-    ax1.set_title('Stock Prices with Political Arbitrage Periods Highlighted', fontsize=14, fontweight='bold')
+    ax1.set_title('Stock Prices with Arbitrage Periods (Red=Rule-Based, Green=Neural Network)', fontsize=14, fontweight='bold')
     ax1.set_xlabel('Date', fontsize=12)
     ax1.set_ylabel('Price ($)', fontsize=12)
     ax1.legend(fontsize=10)
     ax1.grid(True, alpha=0.3)
     
     # 2. Arbitrage scores over time
-    ax2 = plt.subplot(4, 2, 2)
+    ax2 = plt.subplot(5, 2, 2)
     colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728']
     for i, stock in enumerate(stocks):
         ax2.plot(arbitrage_results['arbitrage_scores'].index, arbitrage_results['arbitrage_scores'][stock], 
-                label=stock, alpha=0.8, color=colors[i], linewidth=1.5)
+                label=f'{stock} Rule-Based', alpha=0.8, color=colors[i], linewidth=1.5)
+        
+        # Add neural network probabilities
+        if 'nn_probabilities' in arbitrage_results:
+            ax2.plot(arbitrage_results['nn_probabilities'].index, arbitrage_results['nn_probabilities'][stock], 
+                    label=f'{stock} NN', alpha=0.6, color=colors[i], linewidth=1, linestyle='--')
+    
     ax2.axhline(y=0.7, color='red', linestyle='--', alpha=0.7, label='High Arbitrage Threshold', linewidth=2)
-    ax2.set_title('Political Arbitrage Scores Over Time', fontsize=14, fontweight='bold')
+    ax2.set_title('Arbitrage Scores: Rule-Based vs Neural Network', fontsize=14, fontweight='bold')
     ax2.set_xlabel('Date', fontsize=12)
-    ax2.set_ylabel('Arbitrage Score', fontsize=12)
+    ax2.set_ylabel('Score/Probability', fontsize=12)
     ax2.legend(fontsize=10)
     ax2.grid(True, alpha=0.3)
 
     # 3. Volume surges
-    ax3 = plt.subplot(4, 2, 3)
+    ax3 = plt.subplot(5, 2, 3)
     for i, stock in enumerate(stocks):
         ax3.plot(arbitrage_results['volume_data'].index, arbitrage_results['volume_data'][stock], 
                 label=stock, alpha=0.7, color=colors[i], linewidth=1)
@@ -220,7 +391,7 @@ def visualize_arbitrage_analysis(arbitrage_results, stocks):
     ax3.grid(True, alpha=0.3)
 
     # 4. Volatility spikes
-    ax4 = plt.subplot(4, 2, 4)
+    ax4 = plt.subplot(5, 2, 4)
     for i, stock in enumerate(stocks):
         rolling_vol = arbitrage_results['returns'][stock].rolling(window=20).std()
         ax4.plot(rolling_vol.index, rolling_vol, label=stock, alpha=0.7, color=colors[i], linewidth=1.5)
@@ -231,7 +402,7 @@ def visualize_arbitrage_analysis(arbitrage_results, stocks):
     ax4.grid(True, alpha=0.3)
 
     # 5. Political surge indicators
-    ax5 = plt.subplot(4, 2, 5)
+    ax5 = plt.subplot(5, 2, 5)
     for i, stock in enumerate(stocks):
         ax5.plot(arbitrage_results['political_surge_indicators'].index, 
                 arbitrage_results['political_surge_indicators'][stock], 
@@ -243,7 +414,7 @@ def visualize_arbitrage_analysis(arbitrage_results, stocks):
     ax5.grid(True, alpha=0.3)
 
     # 6. Returns distribution with arbitrage periods
-    ax6 = plt.subplot(4, 2, 6)
+    ax6 = plt.subplot(5, 2, 6)
     arbitrage_returns = []
     normal_returns = []
 
@@ -271,8 +442,41 @@ def visualize_arbitrage_analysis(arbitrage_results, stocks):
     ax6.legend(fontsize=10)
     ax6.grid(True, alpha=0.3)
 
-    # 7. Politician-specific analysis
-    ax7 = plt.subplot(4, 2, 7)
+    # 7. Neural Network vs Rule-Based Comparison
+    ax7 = plt.subplot(5, 2, 7)
+    if 'nn_probabilities' in arbitrage_results:
+        comparison_data = []
+        labels = []
+        
+        for stock in stocks:
+            # Rule-based arbitrage periods
+            rule_based_count = arbitrage_results['high_arbitrage_periods'][stock].sum()
+            # Neural network arbitrage periods
+            nn_count = arbitrage_results['nn_predictions'][stock].sum()
+            # Combined arbitrage periods
+            combined_count = arbitrage_results['combined_arbitrage_periods'][stock].sum()
+            
+            comparison_data.append([rule_based_count, nn_count, combined_count])
+            labels.append(stock)
+        
+        comparison_data = np.array(comparison_data)
+        x = np.arange(len(labels))
+        width = 0.25
+        
+        ax7.bar(x - width, comparison_data[:, 0], width, label='Rule-Based', alpha=0.8)
+        ax7.bar(x, comparison_data[:, 1], width, label='Neural Network', alpha=0.8)
+        ax7.bar(x + width, comparison_data[:, 2], width, label='Combined', alpha=0.8)
+        
+        ax7.set_title('Arbitrage Period Detection Comparison', fontsize=14, fontweight='bold')
+        ax7.set_xlabel('Stocks', fontsize=12)
+        ax7.set_ylabel('Number of Arbitrage Periods', fontsize=12)
+        ax7.set_xticks(x)
+        ax7.set_xticklabels(labels)
+        ax7.legend(fontsize=10)
+        ax7.grid(True, alpha=0.3)
+
+    # 8. Politician-specific analysis
+    ax8 = plt.subplot(5, 2, 8)
     politician_stats = {}
     
     for stock in stocks:
@@ -300,19 +504,19 @@ def visualize_arbitrage_analysis(arbitrage_results, stocks):
     x = np.arange(len(politicians))
     width = 0.35
     
-    ax7.bar(x - width/2, avg_scores, width, label='Avg Arbitrage Score', alpha=0.8)
-    ax7.bar(x + width/2, avg_returns, width, label='Avg Return During Arbitrage', alpha=0.8)
+    ax8.bar(x - width/2, avg_scores, width, label='Avg Arbitrage Score', alpha=0.8)
+    ax8.bar(x + width/2, avg_returns, width, label='Avg Return During Arbitrage', alpha=0.8)
     
-    ax7.set_title('Politician Performance Analysis', fontsize=14, fontweight='bold')
-    ax7.set_xlabel('Politician (Party)', fontsize=12)
-    ax7.set_ylabel('Score/Return', fontsize=12)
-    ax7.set_xticks(x)
-    ax7.set_xticklabels(politicians, rotation=45, ha='right')
-    ax7.legend(fontsize=10)
-    ax7.grid(True, alpha=0.3)
+    ax8.set_title('Politician Performance Analysis', fontsize=14, fontweight='bold')
+    ax8.set_xlabel('Politician (Party)', fontsize=12)
+    ax8.set_ylabel('Score/Return', fontsize=12)
+    ax8.set_xticks(x)
+    ax8.set_xticklabels(politicians, rotation=45, ha='right')
+    ax8.legend(fontsize=10)
+    ax8.grid(True, alpha=0.3)
 
-    # 8. Sector analysis
-    ax8 = plt.subplot(4, 2, 8)
+    # 9. Sector analysis
+    ax9 = plt.subplot(5, 2, 9)
     sector_stats = {}
     
     for stock in stocks:
@@ -337,16 +541,30 @@ def visualize_arbitrage_analysis(arbitrage_results, stocks):
     
     x = np.arange(len(sectors))
     
-    ax8.bar(x - width/2, sector_avg_scores, width, label='Avg Arbitrage Score', alpha=0.8)
-    ax8.bar(x + width/2, sector_avg_returns, width, label='Avg Return During Arbitrage', alpha=0.8)
+    ax9.bar(x - width/2, sector_avg_scores, width, label='Avg Arbitrage Score', alpha=0.8)
+    ax9.bar(x + width/2, sector_avg_returns, width, label='Avg Return During Arbitrage', alpha=0.8)
     
-    ax8.set_title('Sector Performance Analysis', fontsize=14, fontweight='bold')
-    ax8.set_xlabel('Sector', fontsize=12)
-    ax8.set_ylabel('Score/Return', fontsize=12)
-    ax8.set_xticks(x)
-    ax8.set_xticklabels(sectors, rotation=45, ha='right')
-    ax8.legend(fontsize=10)
-    ax8.grid(True, alpha=0.3)
+    ax9.set_title('Sector Performance Analysis', fontsize=14, fontweight='bold')
+    ax9.set_xlabel('Sector', fontsize=12)
+    ax9.set_ylabel('Score/Return', fontsize=12)
+    ax9.set_xticks(x)
+    ax9.set_xticklabels(sectors, rotation=45, ha='right')
+    ax9.legend(fontsize=10)
+    ax9.grid(True, alpha=0.3)
+
+    # 10. Neural Network Confidence Analysis
+    ax10 = plt.subplot(5, 2, 10)
+    if 'nn_probabilities' in arbitrage_results:
+        for i, stock in enumerate(stocks):
+            nn_probs = arbitrage_results['nn_probabilities'][stock]
+            ax10.hist(nn_probs, bins=30, alpha=0.6, label=stock, color=colors[i], density=True)
+        
+        ax10.axvline(x=0.7, color='red', linestyle='--', alpha=0.7, label='High Confidence Threshold')
+        ax10.set_title('Neural Network Confidence Distribution', fontsize=14, fontweight='bold')
+        ax10.set_xlabel('Arbitrage Probability', fontsize=12)
+        ax10.set_ylabel('Density', fontsize=12)
+        ax10.legend(fontsize=10)
+        ax10.grid(True, alpha=0.3)
 
     plt.tight_layout()
     plt.show()
@@ -408,8 +626,9 @@ def create_timeline_visualization(arbitrage_results, stocks):
     plt.show()
 
 def print_arbitrage_analysis(arbitrage_results, stocks):
-    """Print detailed arbitrage analysis with politician context"""
+    """Print detailed arbitrage analysis with politician context and neural network comparison"""
     print("=== POLITICAL ARBITRAGE OPPORTUNITY ANALYSIS ===")
+    print("=== INCLUDING NEURAL NETWORK PATTERN RECOGNITION ===")
 
     # Summary statistics
     for stock in stocks:
@@ -441,6 +660,93 @@ def print_arbitrage_analysis(arbitrage_results, stocks):
                     volume_val = arbitrage_results['volume_data'].loc[date, stock]
                     print(f"    {date.strftime('%Y-%m-%d')}: Score={score:.4f}, Return={return_val:.4f}, Volume={volume_val:,.0f}")
 
+    # Neural Network Analysis
+    if 'nn_predictions' in arbitrage_results:
+        print("\n" + "="*60)
+        print("NEURAL NETWORK ARBITRAGE DETECTION RESULTS")
+        print("="*60)
+        
+        for stock in stocks:
+            nn_predictions = arbitrage_results['nn_predictions'][stock]
+            nn_probabilities = arbitrage_results['nn_probabilities'][stock]
+            
+            # Get politician metadata
+            politician_info = ""
+            if stock in arbitrage_results['politician_metadata']:
+                metadata = arbitrage_results['politician_metadata'][stock]
+                politician_info = f" ({metadata['politician']}, {metadata['party']}, {metadata['sector']})"
+            
+            nn_arbitrage_count = nn_predictions.sum()
+            avg_nn_probability = nn_probabilities.mean()
+            max_nn_probability = nn_probabilities.max()
+            
+            print(f"\n{stock}{politician_info} - Neural Network Analysis:")
+            print(f"  NN Detected Arbitrage Periods: {nn_arbitrage_count}")
+            print(f"  Average NN Probability: {avg_nn_probability:.4f}")
+            print(f"  Max NN Probability: {max_nn_probability:.4f}")
+            
+            # Show top NN probability periods
+            top_nn_periods = nn_probabilities.nlargest(3)
+            print(f"  Top 3 NN High-Probability Periods:")
+            for date, prob in top_nn_periods.items():
+                return_val = arbitrage_results['returns'].loc[date, stock]
+                volume_val = arbitrage_results['volume_data'].loc[date, stock]
+                print(f"    {date.strftime('%Y-%m-%d')}: Probability={prob:.4f}, Return={return_val:.4f}, Volume={volume_val:,.0f}")
+
+    # Combined Analysis
+    if 'combined_arbitrage_periods' in arbitrage_results:
+        print("\n" + "="*60)
+        print("COMBINED DETECTION RESULTS (Rule-Based OR Neural Network)")
+        print("="*60)
+        
+        for stock in stocks:
+            combined_periods = arbitrage_results['combined_arbitrage_periods'][stock]
+            rule_based_periods = arbitrage_results['high_arbitrage_periods'][stock]
+            nn_periods = arbitrage_results['nn_predictions'][stock] if 'nn_predictions' in arbitrage_results else pd.Series([False] * len(combined_periods))
+            
+            # Get politician metadata
+            politician_info = ""
+            if stock in arbitrage_results['politician_metadata']:
+                metadata = arbitrage_results['politician_metadata'][stock]
+                politician_info = f" ({metadata['politician']}, {metadata['party']}, {metadata['sector']})"
+            
+            combined_count = combined_periods.sum()
+            rule_based_count = rule_based_periods.sum()
+            nn_count = nn_periods.sum()
+            
+            print(f"\n{stock}{politician_info} - Combined Detection:")
+            print(f"  Rule-Based Only: {rule_based_count}")
+            print(f"  Neural Network Only: {nn_count}")
+            print(f"  Combined Total: {combined_count}")
+            print(f"  Additional Periods Detected by NN: {combined_count - rule_based_count}")
+            
+            if combined_count > 0:
+                combined_dates = combined_periods[combined_periods].index
+                combined_returns = arbitrage_results['returns'].loc[combined_dates, stock]
+                print(f"  Average Return (Combined): {combined_returns.mean():.4f}")
+                print(f"  Volatility (Combined): {combined_returns.std():.4f}")
+
+    # Model Performance Summary
+    if 'mlp_model' in arbitrage_results:
+        print("\n" + "="*60)
+        print("NEURAL NETWORK MODEL PERFORMANCE")
+        print("="*60)
+        
+        mlp_model = arbitrage_results['mlp_model']
+        print(f"  Model Type: Multi-Layer Perceptron Classifier")
+        print(f"  Hidden Layers: {mlp_model.hidden_layer_sizes}")
+        print(f"  Activation Function: {mlp_model.activation}")
+        print(f"  Solver: {mlp_model.solver}")
+        print(f"  Max Iterations: {mlp_model.max_iter}")
+        
+        # Feature importance analysis
+        print(f"\n  Feature Analysis:")
+        print(f"    - Price Features: Last 5 periods of returns")
+        print(f"    - Volume Features: Volume ratio")
+        print(f"    - Political Features: Surge indicators")
+        print(f"    - Metadata Features: Party, Sector, Volume category")
+        print(f"    - Total Features: 10 features per prediction")
+
 def main():
     """Main function to run the political arbitrage detection"""
     # Define stocks with political context
@@ -451,7 +757,7 @@ def main():
         'META': {'politician': 'John McGuire', 'party': 'Republican', 'sector': 'Technology', 'volume': '1K-5K'},
         'NFLX': {'politician': 'John McGuire', 'party': 'Republican', 'sector': 'Technology', 'volume': '1K-5K'},
         'NOW': {'politician': 'John McGuire', 'party': 'Republican', 'sector': 'Technology', 'volume': '1K-5K'},
-        'FLL': {'politician': 'Susie Lee', 'party': 'Democratic', 'sector': 'Gaming', 'volume': 'Low'}
+        'FLL': {'politician': 'Susie Lee', 'party': 'Democratic', 'sector': 'Gaming', 'volume': '50K-100K'}
     }
 
     print("Starting Political Arbitrage Detection...")
