@@ -104,7 +104,7 @@ def predict_arbitrage_with_nn(arbitrage_results, stocks, mlp_model):
         stock_probabilities = []
         
         for i in range(len(returns)):
-            if i < 5:  # Not enough history
+            if i < 5:  
                 stock_predictions.append(0)
                 stock_probabilities.append(0.0)
             else:
@@ -129,7 +129,7 @@ def predict_arbitrage_with_nn(arbitrage_results, stocks, mlp_model):
                 all_features = price_features + politician_features
                 
                 # Predict
-                prediction = mlp_model.predict([all_features])[0]
+                prediction = mlp_model.predict([all_features])[0]   #mlp sets prediction to 1 or 0
                 probability = mlp_model.predict_proba([all_features])[0][1]  # Probability of arbitrage
                 
                 stock_predictions.append(prediction)
